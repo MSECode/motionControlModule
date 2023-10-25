@@ -15,6 +15,7 @@ private:
     yarp::os::BufferedPort<yarp::os::Bottle>  _outputPort;
 
     double *_motorTemperatures;
+    double *_motorTemperatureLimits;
     int _nmotors;
 
     std::string _portPrefix="/5-setup";

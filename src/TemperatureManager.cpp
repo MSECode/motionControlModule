@@ -27,8 +27,11 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
     // Create remote motion control device
     Property options;
     options.put("device", "remote_controlboard");
-    options.put("remote", "/"+ _robotName + "/5-setup");
+    options.put("remote", "/"+ _robotName + _portPrefix);
     options.put("local", _portPrefix + "/mc");
+
+
+        yError() << "++++ config:" << _portPrefix;
 
     _motionControlDevice.open(options);
 
@@ -100,7 +103,14 @@ bool TemperatureManager::updateModule()
         yError() << "Unable to get motor temperatures. Aborting...";
         return false;
     }
-    
+
+    if (!_imot->getTemperatureLimits(_motorTemperatureLimits))
+    {
+        yError() << "Unable to get motor temperature Limits. Aborting...";
+        return false;
+    }
+
+
     sendData2OutputPort(_motorTemperatures);
     
     return true;
@@ -126,9 +136,13 @@ bool TemperatureManager::sendData2OutputPort(double * temperatures)
     b.clear();
 
     b.addFloat64(stamp.getTime());
-    for (size_t i = 0; i < _nmotors; i++)
+    for (size_t i = 0; i < 1; i++)
     {
         b.addFloat64(temperatures[i]);
+	uint8_t allarm=0;
+	if(temperatures[i] >= _motorTemperatureLimits[i])
+		allarm=1;
+	b.addInt8(allarm);
     }
     _outputPort.write();
     
@@ -139,6 +153,7 @@ bool TemperatureManager::sendData2OutputPort(double * temperatures)
 bool TemperatureManager::alloc(int nm)
 {
     _motorTemperatures = allocAndCheck<double>(nm);
+    _motorTemperatureLimits = allocAndCheck<double>(nm);
 
     return true;
 
@@ -147,6 +162,7 @@ bool TemperatureManager::alloc(int nm)
 bool TemperatureManager::dealloc()
 {
     checkAndDestroy(_motorTemperatures);
+    checkAndDestroy(_motorTemperatureLimits);
 
     return true;
 }
