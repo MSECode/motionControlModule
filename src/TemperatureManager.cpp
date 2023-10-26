@@ -31,7 +31,7 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
     options.put("local", _portPrefix + "/mc");
 
 
-        yError() << "++++ config:" << _portPrefix;
+    yDebug() << "++++ config:" << _portPrefix;
 
     _motionControlDevice.open(options);
 
@@ -104,11 +104,16 @@ bool TemperatureManager::updateModule()
         return false;
     }
 
-    if (!_imot->getTemperatureLimits(_motorTemperatureLimits))
+    for (size_t i = 0; i < _nmotors; i++)
     {
-        yError() << "Unable to get motor temperature Limits. Aborting...";
-        return false;
+        if (!_imot->getTemperatureLimit((uint8_t)i, _motorTemperatureLimits))
+        {
+            yError() << "Unable to get motor temperature Limits. Aborting...";
+            return false;
+        }
     }
+    
+    
 
 
     sendData2OutputPort(_motorTemperatures);
@@ -136,7 +141,7 @@ bool TemperatureManager::sendData2OutputPort(double * temperatures)
     b.clear();
 
     b.addFloat64(stamp.getTime());
-    for (size_t i = 0; i < 1; i++)
+    for (size_t i = 0; i < _nmotors; i++)
     {
         b.addFloat64(temperatures[i]);
 	uint8_t allarm=0;

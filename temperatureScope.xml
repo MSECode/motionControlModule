@@ -4,14 +4,21 @@
           gridy="0"
           hspan="1"
 	      vspan="1"
-          minval="-100"
-	      maxval="100"
+          minval="-10"
+	      maxval="50"
           title="Motor temperature Plot"
           bgcolor="LightSlateGrey">
     <graph remote="/5-setup/motor_temperatures:o"
-               index="0"
-               color="Red"
+               index="1"
+               color="Blue"
                title="Motor temperature"
+               type="lines"
+               size="3" />
+    </plot>
+    <graph remote="/5-setup/motor_temperatures:o"
+               index="2"
+               color="Red"
+               title="Temperature Limit"
                type="lines"
                size="3" />
     </plot>

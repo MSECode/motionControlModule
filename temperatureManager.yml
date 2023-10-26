@@ -11,7 +11,7 @@ version: "3.7"
 
 x-motorControlModule-tty: &motorControlModule-tty
   # image: ghcr.io/icub-tech-iit/docker-deployment-images/cd_superbuild-icubhead-withuser:master-unstable_sources
-  image: test_image_temperature:v10
+  image: test_image_temperature:v12
   environment:
     - YARP_FORWARD_LOG_ENABLE=1
     - DISPLAY=${DISPLAY}
