@@ -72,6 +72,20 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
+    for (size_t i = 0; i < _nmotors; i++)
+    {
+        if (!_imot->getTemperatureLimit((uint8_t)i, _motorTemperatureLimits))
+        {
+            yError() << "Unable to get motor temperature Limits. Aborting...";
+            return false;
+        }
+        else
+        {
+            yDebug() << "Limit for motor#" << i << "value:" << _motorTemperatureLimits[i];
+        }
+        
+    }
+
     return true;
 }
 
@@ -104,18 +118,6 @@ bool TemperatureManager::updateModule()
         return false;
     }
 
-    for (size_t i = 0; i < _nmotors; i++)
-    {
-        if (!_imot->getTemperatureLimit((uint8_t)i, _motorTemperatureLimits))
-        {
-            yError() << "Unable to get motor temperature Limits. Aborting...";
-            return false;
-        }
-    }
-    
-    
-
-
     sendData2OutputPort(_motorTemperatures);
     
     return true;
@@ -144,10 +146,10 @@ bool TemperatureManager::sendData2OutputPort(double * temperatures)
     for (size_t i = 0; i < _nmotors; i++)
     {
         b.addFloat64(temperatures[i]);
-	uint8_t allarm=0;
+	    uint8_t allarm=0;
 	if(temperatures[i] >= _motorTemperatureLimits[i])
 		allarm=1;
-	b.addInt8(allarm);
+	    b.addInt8(allarm);
     }
     _outputPort.write();
     
