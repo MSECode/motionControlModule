@@ -72,9 +72,9 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
-    for (size_t i = 0; i < _nmotors; i++)
+    for (uint8_t i = 0; i < _nmotors; i++)
     {
-        if (!_imot->getTemperatureLimit((uint8_t)i, _motorTemperatureLimits))
+        if (!_imot->getTemperatureLimit(i, &_motorTemperatureLimits[i]))
         {
             yError() << "Unable to get motor temperature Limits. Aborting...";
             return false;
