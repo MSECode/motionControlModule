@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<portscope rows="1" columns="1" carrier="mcast">
+    <plot gridx="0"
+          gridy="0"
+          hspan="1"
+	      vspan="1"
+          minval="-10"
+	      maxval="50"
+          title="Motor temperature Plot"
+          bgcolor="LightSlateGrey">
+    <graph remote="/5-setup/motor_temperatures:o"
+               index="1"
+               color="Blue"
+               title="Motor temperature"
+               type="lines"
+               size="3" />
+    </plot>
+    <graph remote="/5-setup/motor_temperatures:o"
+               index="2"
+               color="Red"
+               title="Temperature Limit"
+               type="lines"
+               size="3" />
+    </plot>
+</portscope>
