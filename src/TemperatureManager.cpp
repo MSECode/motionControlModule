@@ -111,6 +111,11 @@ double TemperatureManager::getPeriod()
 
 bool TemperatureManager::updateModule()
 {
+    
+    for (size_t i = 0; i < _nmotors; i++)
+    {
+    	_motorTemperatures[i]= 0;
+    }
     // yDebug() << "Temperature vector has size" << sizeof(_motorTemperatures);
     if (!_imot->getTemperatures(_motorTemperatures))
     {
