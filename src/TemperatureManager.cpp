@@ -22,6 +22,14 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         if(conf_group.check("portprefix")) { _portPrefix = conf_group.find("portprefix").asString(); }
         if(conf_group.check("period")) { _updatePeriod = conf_group.find("period").asFloat64(); }
         if(conf_group.check("robotname")) { _robotName = conf_group.find("robotname").asString(); }
+        if(conf_group.check("numsensedjoints")) {_nSensedJoints = conf_group.find("numsensedjoints").asInt32();}
+        if (conf_group.check("listofjoints"))
+        {
+            Bottle* jointsBottle = conf_group.find("listofjoints").asList();
+            _nEnabledMotors = jointsBottle->size();
+            for(int i=0; i < _nEnabledMotors; i++) _listOfJoints.push_back(jointsBottle->get(i).asInt32());
+        }
+        
     }
     
     // Create remote motion control device
@@ -55,10 +63,11 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
     else
     {
         yDebug() << "Working with" << _nmotors << "motors";
+        yDebug() << "Enabling" << _nEnabledMotors << "motors of the subpart";
     }
     
     // Allocate memory for pointers
-    if (!alloc(_nmotors))
+    if (!alloc(_nEnabledMotors))
     {
         yError() << "Error allocating memory for pointers. Aborting...";
         return false;
@@ -72,7 +81,7 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         return false;
     }
 
-    for (uint8_t i = 0; i < _nmotors; i++)
+    for (uint8_t i = 0; i < _listOfJoints.size(); i++)
     {
         if (!_imot->getTemperatureLimit(i, &_motorTemperatureLimits[i]))
         {
@@ -112,16 +121,32 @@ double TemperatureManager::getPeriod()
 bool TemperatureManager::updateModule()
 {
     
-    for (size_t i = 0; i < _nmotors; i++)
+    for (int i = 0; i < _listOfJoints.size(); i++)
     {
     	_motorTemperatures[i]= 0;
     }
     // yDebug() << "Temperature vector has size" << sizeof(_motorTemperatures);
-    if (!_imot->getTemperatures(_motorTemperatures))
+    if (_nEnabledMotors < _nSensedJoints )
     {
-        yError() << "Unable to get motor temperatures. Aborting...";
+        int jointNib = 0;
+        for (int i = 0; i < _listOfJoints.size(); i++)
+        {
+            jointNib = (int)_listOfJoints[i];
+            if (!_imot->getTemperature(jointNib, &_motorTemperatures[jointNib]))
+            {
+                yError() << "Unable to get motor" << jointNib << "temperature. Aborting...";
+            }
+        }
     }
-
+    else
+    {
+        if (!_imot->getTemperatures(_motorTemperatures))
+        {
+            yError() << "Unable to get motor temperatures. Aborting...";
+        }
+    }
+    
+    
     sendData2OutputPort(_motorTemperatures);
     
     return true;
@@ -147,7 +172,7 @@ bool TemperatureManager::sendData2OutputPort(double * temperatures)
     b.clear();
 
     b.addFloat64(stamp.getTime());
-    for (size_t i = 0; i < _nmotors; i++)
+    for (size_t i = 0; i < _nEnabledMotors; i++)
     {
         b.addFloat64(temperatures[i]);
 	    uint8_t allarm=0;

@@ -9,9 +9,8 @@ version: "3.7"
 # - add the variable exporting in your .bashrc file so each time you open a terminal you have it declared
 # - add it to the .bash_aliases file considering that that special file is looked for by the .bashrc
 
-x-motorControlModule-tty: &motorControlModule-tty
-  # image: ghcr.io/icub-tech-iit/docker-deployment-images/cd_superbuild-icubhead-withuser:master-unstable_sources
-  image: test_image_temperature:v12
+x-TemperatureManager: &TemperatureManager
+  image: ghcr.io/icub-tech-iit/docker-deployment-images/cd_superbuild-icubhead-withuser:master-unstable_sources
   environment:
     - YARP_FORWARD_LOG_ENABLE=1
     - DISPLAY=${DISPLAY}
@@ -24,15 +23,19 @@ x-motorControlModule-tty: &motorControlModule-tty
     - "${XAUTHORITY}:${ROOT_DIR}/.Xauthority"
   working_dir: ${ROOT_DIR}/workspace/motionControlModule
   network_mode: "host"
-  privileged: true
-  tty: true
-  stdin_open: true
 
 services:
   app:
-    <<: *motorControlModule-tty
-    command: bash 
+    <<: *TemperatureManager
+    restart: on-failure
+    command: ./build/TemperatureManager --from app/conf/config.ini
 
+  splitter:
+    <<: *TemperatureManager
+    restart: on-failure
+    command: yarp split /ergocub2S/upper_arm/stateExt:o 
+  
   scope:
-    <<: *motorControlModule-tty
-    command: bash
+    <<: *TemperatureManager
+    restart: on-failure
+    command: yarpscope --xml temperatureScopeUpperArm.xml

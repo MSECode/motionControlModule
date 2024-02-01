@@ -3,6 +3,7 @@
 
 #include <yarp/os/RFModule.h>
 #include <yarp/dev/PolyDriver.h>
+#include <yarp/sig/Vector.h>
 #include <yarp/os/Bottle.h>
 #include <yarp/dev/ControlBoardHelper.h>
 #include <yarp/dev/ControlBoardInterfaces.h>
@@ -17,10 +18,13 @@ private:
     double *_motorTemperatures;
     double *_motorTemperatureLimits;
     int _nmotors;
+    int _nEnabledMotors = 0;
 
     std::string _portPrefix="/5-setup";
     double _updatePeriod = 1; //seconds
     std::string _robotName= "icub";
+    int _nSensedJoints = 0;
+    yarp::sig::Vector _listOfJoints = 0;
 
     yarp::dev::PolyDriver _motionControlDevice;
 
