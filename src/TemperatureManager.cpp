@@ -22,7 +22,6 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         if(conf_group.check("portprefix")) { _portPrefix = conf_group.find("portprefix").asString(); }
         if(conf_group.check("period")) { _updatePeriod = conf_group.find("period").asFloat64(); }
         if(conf_group.check("robotname")) { _robotName = conf_group.find("robotname").asString(); }
-        if(conf_group.check("numsensedjoints")) {_nSensedJoints = conf_group.find("numsensedjoints").asInt32();}
         if (conf_group.check("listofjoints"))
         {
             Bottle* jointsBottle = conf_group.find("listofjoints").asList();
@@ -65,8 +64,9 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         yDebug() << "Working with" << _nmotors << "motors";
         yDebug() << "Enabling" << _nEnabledMotors << "motors of the subpart";
     }
+    _nEnabledMotors =  (_nEnabledMotors == 0) ? _nmotors : _nEnabledMotors;
     
-    // Allocate memory for pointers
+    // Allocate memory for pointer
     if (!alloc(_nEnabledMotors))
     {
         yError() << "Error allocating memory for pointers. Aborting...";
@@ -86,7 +86,6 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         if (!_imot->getTemperatureLimit(i, &_motorTemperatureLimits[i]))
         {
             yError() << "Unable to get motor temperature Limits. Aborting...";
-            //return false;
         }
         else
         {
@@ -124,29 +123,13 @@ bool TemperatureManager::updateModule()
     for (int i = 0; i < _listOfJoints.size(); i++)
     {
     	_motorTemperatures[i]= 0;
-    }
-    // yDebug() << "Temperature vector has size" << sizeof(_motorTemperatures);
-    if (_nEnabledMotors < _nSensedJoints )
-    {
-        int jointNib = 0;
-        for (int i = 0; i < _listOfJoints.size(); i++)
+        int jointNib = (int)_listOfJoints[i];
+        if (!_imot->getTemperature(jointNib, &_motorTemperatures[jointNib]))
         {
-            jointNib = (int)_listOfJoints[i];
-            if (!_imot->getTemperature(jointNib, &_motorTemperatures[jointNib]))
-            {
-                yError() << "Unable to get motor" << jointNib << "temperature. Aborting...";
-            }
+            yError() << "Unable to get motor" << jointNib << "temperature. Aborting...";
         }
     }
-    else
-    {
-        if (!_imot->getTemperatures(_motorTemperatures))
-        {
-            yError() << "Unable to get motor temperatures. Aborting...";
-        }
-    }
-    
-    
+
     sendData2OutputPort(_motorTemperatures);
     
     return true;

@@ -23,7 +23,6 @@ private:
     std::string _portPrefix="/5-setup";
     double _updatePeriod = 1; //seconds
     std::string _robotName= "icub";
-    int _nSensedJoints = 0;
     yarp::sig::Vector _listOfJoints = 0;
 
     yarp::dev::PolyDriver _motionControlDevice;
