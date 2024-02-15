@@ -13,6 +13,7 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
 {
     // Read configuration file
     Bottle &conf_group = rf.findGroup("GENERAL");
+    Bottle* jointsBottle = nullptr;
     if (conf_group.isNull())
     {
         yWarning() << "Missing GENERAL group! The module uses the default values";
@@ -24,7 +25,7 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         if(conf_group.check("robotname")) { _robotName = conf_group.find("robotname").asString(); }
         if (conf_group.check("listofjoints"))
         {
-            Bottle* jointsBottle = conf_group.find("listofjoints").asList();
+            jointsBottle = conf_group.find("listofjoints").asList();
             _nEnabledMotors = jointsBottle->size();
             for(int i=0; i < _nEnabledMotors; i++) _listOfJoints.push_back(jointsBottle->get(i).asInt32());
         }
@@ -38,7 +39,11 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
     options.put("local", _portPrefix + "/mc");
 
 
-    yDebug() << "++++ config:" << _portPrefix;
+    yDebug() << "++++ config:\n" 
+        << "\t portprefix: " << _portPrefix << "\n"
+        << "\t period: " << _updatePeriod << "\n"
+        << "\t robotname: " << _robotName << "\n"
+        << "\t listofjoints: " << jointsBottle->toString() << "\n";
 
     _motionControlDevice.open(options);
 
@@ -64,7 +69,6 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         yDebug() << "Working with" << _nmotors << "motors";
         yDebug() << "Enabling" << _nEnabledMotors << "motors of the subpart";
     }
-    _nEnabledMotors =  (_nEnabledMotors == 0) ? _nmotors : _nEnabledMotors;
     
     // Allocate memory for pointer
     if (!alloc(_nEnabledMotors))
@@ -86,6 +90,7 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
         if (!_imot->getTemperatureLimit(i, &_motorTemperatureLimits[i]))
         {
             yError() << "Unable to get motor temperature Limits. Aborting...";
+            return false;
         }
         else
         {
@@ -126,7 +131,7 @@ bool TemperatureManager::updateModule()
         int jointNib = (int)_listOfJoints[i];
         if (!_imot->getTemperature(jointNib, &_motorTemperatures[jointNib]))
         {
-            yError() << "Unable to get motor" << jointNib << "temperature. Aborting...";
+            yError() << "Unable to get motor " << jointNib << " temperature.\n";
         }
     }
 

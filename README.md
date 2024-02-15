@@ -37,3 +37,7 @@ In order to use this module, whose final target is to print at the port called: 
     timeStamp | temperature_motor_0 | ... | temperature_motor_N | boolean_limit_overcame_0 | ... | boolean_limit_overcame_N
     ```
 
+    - the `config.ini` file should be filled in with the following data:
+        - `robotname`: name of the robot as set in the configuration files 
+        - `period`: times used for streaming the data to the port
+        - `listofjoints`: joints, as list a list, i.e. (0 1 2), which you wanna get the temperatures
