@@ -14,80 +14,99 @@ bool TemperatureManager::configure(yarp::os::ResourceFinder& rf)
     // Read configuration file
     Bottle &conf_group = rf.findGroup("GENERAL");
     Bottle* jointsBottle = nullptr;
+    Bottle* subpartsBottle = nullptr;
+    std::vector<std::string> localPortPrefixes;
+    std::vector<std::string> remoteControlBoardsPorts;
     if (conf_group.isNull())
     {
         yWarning() << "Missing GENERAL group! The module uses the default values";
     }
     else
     {
-        if(conf_group.check("portprefix")) { _portPrefix = conf_group.find("portprefix").asString(); }
-        if(conf_group.check("period")) { _updatePeriod = conf_group.find("period").asFloat64(); }
         if(conf_group.check("robotname")) { _robotName = conf_group.find("robotname").asString(); }
-        if (conf_group.check("listofjoints"))
+        if(conf_group.check("period")) { _updatePeriod = conf_group.find("period").asFloat64(); }
+        if (conf_group.check("listofsubparts") && conf_group.check("listofjoints") )
         {
+            subpartsBottle = conf_group.find("listofsubparts").asList();
             jointsBottle = conf_group.find("listofjoints").asList();
-            _nEnabledMotors = jointsBottle->size();
-            for(int i=0; i < _nEnabledMotors; i++) _listOfJoints.push_back(jointsBottle->get(i).asInt32());
+            _nsubparts = jointsBottle->size();
+            remoteControlBoardsPorts.resize(_nsubparts);
+            localPortPrefixes.resize(_nsubparts);
+
+            if(subpartsBottle->size() != jointsBottle->size())
+            {
+                yError() << "Dimension of subparts and joints lists must be equal";
+                return false;
+            }
+            else
+            {
+                for(int i=0; i < _nsubparts; i++) 
+                {
+                    localPortPrefixes.push_back("/" + subpartsBottle->get(i).asString() + "/mc");
+                    remoteControlBoardsPorts.push_back("/"+ _robotName + "/" + subpartsBottle->get(i).asString());
+                    for (int j = 0; j < jointsBottle->get(i).asList()->size(); j++)
+                    {
+                        _mapOfJoints.push_back({subpartsBottle->get(i).asString().c_str(), jointsBottle->get(i).asList()->get(j).asInt32()});
+                        ++_nmotors;
+                    }
+                    yDebug() << "Inserted element: <" << subpartsBottle->get(i).asString().c_str() << "," << jointsBottle->get(i).asList()->toString() << ">";
+                }
+            }
         }
+    }
+    
+    yDebug() << "++++ config ++++:\n" 
+    << "\t period: " << _updatePeriod << "\n"
+    << "\t robotname: " << _robotName << "\n"
+    << "\t listsubparts: " << subpartsBottle->toString() << "\n"
+    << "\t listofjoints: " << jointsBottle->toString() << "\n";
+    
+    // Create remote motion control devices (one per each subparts)
+    // Parameters loaded, open all the remote controlboards
+    _remoteControlBoardDevices.resize(remoteControlBoardsPorts.size(), nullptr);
+    yarp::dev::PolyDriverList remoteControlBoardsList;
+
+    for (uint8_t i = 0; i < remoteControlBoardsPorts.size(); i++)
+    {
+        yarp::os::Property options;
+        options.put("device", "remote_controlboards");
+        options.put("local", localPortPrefixes[i]);
+        options.put("remote", remoteControlBoardsPorts[i]);
         
+        _remoteControlBoardDevices[i] = new yarp::dev::PolyDriver();
+        bool ok = _remoteControlBoardDevices[i]->open(options);
+        if(!ok || !(_remoteControlBoardDevices[i]->isValid()))
+        {
+            yError() << "Unable to open device driver #:" << i << "Closing devices...";
+            closeAllRemoteControlBoards();
+            return false;
+        }
+
+        std::string res = ok ? "TODO BIEN" : "SKIFOOO";
+        yDebug() << res.c_str() << "\n";
+
+        // We use the remote name of the remote_controlboard as the key for it, in absence of anything better
+        remoteControlBoardsList.push((_remoteControlBoardDevices[i]),remoteControlBoardsPorts[i].c_str());
     }
     
-    // Create remote motion control device
-    Property options;
-    options.put("device", "remote_controlboard");
-    options.put("remote", "/"+ _robotName + _portPrefix);
-    options.put("local", _portPrefix + "/mc");
-
-
-    yDebug() << "++++ config:\n" 
-        << "\t portprefix: " << _portPrefix << "\n"
-        << "\t period: " << _updatePeriod << "\n"
-        << "\t robotname: " << _robotName << "\n"
-        << "\t listofjoints: " << jointsBottle->toString() << "\n";
-
-    _motionControlDevice.open(options);
-
-    if (!_motionControlDevice.isValid())
+    if(!attachAll(remoteControlBoardsList))
     {
-        yError() << "Unable to open device driver. Aborting...";
+        yError() << "AttachAll failed, some subdevice was not found or its attach failed";
         return false;
     }
-    
-    if (!_motionControlDevice.view(_imot) || _imot==nullptr)
-    {
-        yError() << "Unable to open motor raw interface. Aborting...";
-        return false;
-    }
-    
-    if (!_imot->getNumberOfMotors(&_nmotors))
-    {
-        yError() << "Unable to retrieve the number of motors";
-        return false;
-    }
-    else
-    {
-        yDebug() << "Working with" << _nmotors << "motors";
-        yDebug() << "Enabling" << _nEnabledMotors << "motors of the subpart";
-    }
+    yDebug() << "Working with totally" << _nmotors << "motors and" << _nsubparts << "subparts";
     
     // Allocate memory for pointer
-    if (!alloc(_nEnabledMotors))
+    if (!alloc(_nsubparts))
     {
         yError() << "Error allocating memory for pointers. Aborting...";
         return false;
     }
     
-    
-    // open the communication port towards motor controller module
-    if(!_outputPort.open(_portPrefix +"/motor_temperatures:o"))
+    for (uint8_t i = 0; i < _mapOfJoints.size(); i++)
     {
-        yError() << "Error opening output port for motor control";
-        return false;
-    }
-
-    for (uint8_t i = 0; i < _listOfJoints.size(); i++)
-    {
-        if (!_imot->getTemperatureLimit(i, &_motorTemperatureLimits[i]))
+        yarp::dev::IMotor *imotp = _iMotorDevices.at(i);
+        if (!imotp->getTemperatureLimit(i, &_motorTemperatureLimits[i]))
         {
             yError() << "Unable to get motor temperature Limits. Aborting...";
             return false;
@@ -113,6 +132,8 @@ bool TemperatureManager::close()
         yError() << "Error deallocating memory for pointer. Failing...";
         return false;
     }
+
+    closeAllRemoteControlBoards();
     
     return true;
 }
@@ -124,30 +145,31 @@ double TemperatureManager::getPeriod()
 
 bool TemperatureManager::updateModule()
 {
-    
-    for (int i = 0; i < _listOfJoints.size(); i++)
+    int jointNib = 0;
+    for (int i = 0; i < _mapOfJoints.size(); i++)
     {
+        yarp::dev::IMotor *imotp = _iMotorDevices.at(i);
     	_motorTemperatures[i]= 0;
-        int jointNib = (int)_listOfJoints[i];
-        if (!_imot->getTemperature(jointNib, &_motorTemperatures[jointNib]))
+        jointNib = i;
+        if (!imotp->getTemperature(jointNib, &_motorTemperatures[jointNib]))
         {
             yError() << "Unable to get motor " << jointNib << " temperature.\n";
         }
     }
 
-    sendData2OutputPort(_motorTemperatures);
+    sendData2OutputPort(&_motorTemperatures[jointNib]);
     
-    return true;
+    return false;
 }
 
 
-TemperatureManager::TemperatureManager(): _imot(nullptr)
+TemperatureManager::TemperatureManager()
 {;}
 
 TemperatureManager::~TemperatureManager()
 {;}
 
-// Private methods
+// // Private methods
 bool TemperatureManager::sendData2OutputPort(double * temperatures)
 {
     static yarp::os::Stamp stamp;
@@ -160,7 +182,7 @@ bool TemperatureManager::sendData2OutputPort(double * temperatures)
     b.clear();
 
     b.addFloat64(stamp.getTime());
-    for (size_t i = 0; i < _nEnabledMotors; i++)
+    for (size_t i = 0; i < _nmotors; i++)
     {
         b.addFloat64(temperatures[i]);
 	    uint8_t allarm=0;
@@ -174,10 +196,11 @@ bool TemperatureManager::sendData2OutputPort(double * temperatures)
     return true;
 }
 
-bool TemperatureManager::alloc(int nm)
+bool TemperatureManager::alloc(int ns)
 {
-    _motorTemperatures = allocAndCheck<double>(nm);
-    _motorTemperatureLimits = allocAndCheck<double>(nm);
+    
+    _motorTemperatures.resize(ns);
+    _motorTemperatureLimits.resize(ns);
 
     return true;
 
@@ -185,8 +208,46 @@ bool TemperatureManager::alloc(int nm)
 
 bool TemperatureManager::dealloc()
 {
-    checkAndDestroy(_motorTemperatures);
-    checkAndDestroy(_motorTemperatureLimits);
+    _motorTemperatures.resize(0);
+    _motorTemperatureLimits.resize(0);
+    
 
+    return true;
+}
+
+void TemperatureManager::closeAllRemoteControlBoards()
+{
+    for(auto& _remoteControlBoardDevice : _remoteControlBoardDevices)
+    {
+        if( _remoteControlBoardDevice )
+        {
+            _remoteControlBoardDevice->close();
+            delete _remoteControlBoardDevice;
+            _remoteControlBoardDevice = nullptr;
+        }
+    }
+
+    _remoteControlBoardDevices.resize(0);
+}
+
+bool TemperatureManager::attachAll(const yarp::dev::PolyDriverList &polylist)
+{
+    // call attach all
+    for (uint8_t i = 0; i < polylist.size(); i++)
+    {    
+        yarp::dev::IMotor *imotp = _iMotorDevices.at(i);
+        if (!polylist[i]->poly->view(imotp) || imotp==nullptr)
+        {
+            yError() << "Unable to open motor raw interface. Aborting...";
+            return false;
+        }
+        // open the communication port towards motor controller module
+        yDebug() << "Requesting opening of port" << (_robotName+"/motor_temperatures:o");
+        if(!_outputPort.open(_robotName+"/motor_temperatures:o"))
+        {
+            yError() << "Error opening output port for motor control";
+            return false;
+        }
+    }
     return true;
 }

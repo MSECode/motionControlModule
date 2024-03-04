@@ -26,7 +26,7 @@ int main(int argc, char * argv[])
     //rf.seDefaultContext("TemperatureManager");
     //rf.setDefaultConfigFile("config.ini");
     rf.configure(argc, argv);
-    rf.setVerbose(true);
+    // rf.setVerbose(true);
     yDebug() << "Configuring and starting module. \n";
     module.runModule(rf);   // This calls configure(rf) and, upon success, the module execution begins with a call to updateModule()
     yDebug()<<"Main returning...";
